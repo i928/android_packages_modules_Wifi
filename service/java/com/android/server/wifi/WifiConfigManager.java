@@ -3555,6 +3555,23 @@ public class WifiConfigManager {
     }
 
     /**
+     * Re-enable PSK on a stored network whose PSK was disabled by WPA3 Transition Disable while
+     * its only other security type is the auto-upgrade SAE entry and SAE auto-upgrade is off.
+     * Such a network has no usable security type; see updateNetworkTransitionDisable.
+     */
+    private void restorePskDisabledByTransitionDisable(WifiConfiguration config) {
+        if (mWifiInjector.getWifiGlobals().isWpa3SaeUpgradeEnabled()) return;
+        SecurityParams pskParams = config.getSecurityParams(WifiConfiguration.SECURITY_TYPE_PSK);
+        SecurityParams saeParams = config.getSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
+        if (pskParams == null || pskParams.isEnabled()
+                || saeParams == null || !saeParams.isAddedByAutoUpgrade()) {
+            return;
+        }
+        config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_PSK, true);
+        Log.i(TAG, "SAE upgrade disabled, re-enabled PSK for " + config.getProfileKey());
+    }
+
+    /**
      * Helper function to populate the internal (in-memory) data from the retrieved shared store
      * (file) data.
      *
@@ -3582,6 +3599,7 @@ public class WifiConfigManager {
                 continue;
             }
 
+            restorePskDisabledByTransitionDisable(configuration);
             configuration.networkId = mNextNetworkId++;
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, "Adding network from shared store "
@@ -3621,6 +3639,7 @@ public class WifiConfigManager {
                 continue;
             }
 
+            restorePskDisabledByTransitionDisable(configuration);
             configuration.networkId = mNextNetworkId++;
             if (mVerboseLoggingEnabled) {
                 Log.v(TAG, "Adding network from user store "
