@@ -4201,8 +4201,20 @@ public class WifiConfigManager {
         boolean changed = false;
         if (0 != (indicationBit & WifiMonitor.TDI_USE_WPA3_PERSONAL)
                 && config.isSecurityType(WifiConfiguration.SECURITY_TYPE_SAE)) {
-            config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_PSK, false);
-            changed = true;
+            // A PSK network always carries an auto-upgrade SAE entry. When SAE auto-upgrade is
+            // disabled (config_wifiSaeUpgradeEnabled=false, e.g. crosshatch) that entry is never
+            // used, so disabling PSK here leaves the network with no usable security type: it is
+            // never selected again and a manual connect is rejected by the AP.
+            SecurityParams saeParams =
+                    config.getSecurityParams(WifiConfiguration.SECURITY_TYPE_SAE);
+            if (saeParams != null && saeParams.isAddedByAutoUpgrade()
+                    && !mWifiInjector.getWifiGlobals().isWpa3SaeUpgradeEnabled()) {
+                localLog("updateNetworkTransitionDisable: SAE upgrade disabled, keep PSK for "
+                        + config.getProfileKey());
+            } else {
+                config.setSecurityParamsEnabled(WifiConfiguration.SECURITY_TYPE_PSK, false);
+                changed = true;
+            }
         }
         if (0 != (indicationBit & WifiMonitor.TDI_USE_SAE_PK)) {
             config.enableSaePkOnlyMode(true);
